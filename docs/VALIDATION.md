@@ -28,6 +28,8 @@ Validated on Windows 10 x64 with Node.js 24.21.0 LTS, Electron 44.4.5 and Micros
 
 The interface was also opened with agent-browser and visually inspected. No runtime errors or Vite error overlay were detected. A screenshot is in `docs/studio.png`.
 
+The same desktop smoke check also passed against the packaged `release/win-unpacked/X Artist.exe`. The portable Windows artifact was built successfully, with the generated icon embedded, and its Authenticode status is `NotSigned`. A SHA-256 checksum accompanies the release.
+
 ## What remains unverified
 
 - Physical Wacom, Huion, XP-Pen, Surface and other pen hardware. The implementation consumes standard Windows Ink pressure, tilt and eraser events; driver settings and hardware capabilities vary.
