@@ -1,3 +1,4 @@
+import { rasterContext } from './raster';
 export type BrushId = 'ink' | 'pencil' | 'round' | 'marker' | 'airbrush' | 'chalk' | 'wash' | 'tone';
 export type Sample = { x: number; y: number; pressure: number; tiltX: number; tiltY: number };
 export type BrushSettings = {
@@ -55,7 +56,7 @@ export class Stroke {
   private makeTip() {
     const tip = document.createElement('canvas');
     tip.width = tip.height = 128;
-    const c = tip.getContext('2d')!;
+    const c = rasterContext(tip);
     c.fillStyle = this.settings.color;
     if (this.settings.kind === 'airbrush' || this.settings.kind === 'wash') {
       const gradient = c.createRadialGradient(64, 64, 0, 64, 64, 64);

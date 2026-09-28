@@ -1,3 +1,4 @@
+import { rasterContext } from './raster';
 export type Blend = 'source-over' | 'multiply' | 'screen' | 'overlay';
 export type Rect = { x: number; y: number; w: number; h: number };
 export type Layer = {
@@ -107,7 +108,7 @@ export class ArtDocument {
       blend: 'source-over',
       canvas: surface(this.width, this.height),
     };
-    if (source) layer.canvas.getContext('2d')!.drawImage(source, 0, 0);
+    if (source) rasterContext(layer.canvas).drawImage(source, 0, 0);
     const previous = this.active;
     const index = this.layers.findIndex((l) => l.id === previous) + 1;
     this.layers.splice(index, 0, layer);
@@ -176,11 +177,11 @@ export class ArtDocument {
     });
   }
   capture() {
-    return this.layer.canvas.getContext('2d')!.getImageData(0, 0, this.width, this.height);
+    return rasterContext(this.layer.canvas).getImageData(0, 0, this.width, this.height);
   }
   commitPixels(before: ImageData, id = this.active) {
     const l = this.layers.find((l) => l.id === id)!;
-    const ctx = l.canvas.getContext('2d')!;
+    const ctx = rasterContext(l.canvas);
     const after = ctx.getImageData(0, 0, this.width, this.height);
     this.record({
       bytes: before.data.byteLength + after.data.byteLength,
@@ -197,7 +198,7 @@ export class ArtDocument {
   edit(fn: (ctx: CanvasRenderingContext2D) => void) {
     if (this.layer.locked || !this.layer.visible) throw new Error('locked');
     const before = this.capture();
-    const ctx = this.layer.canvas.getContext('2d')!;
+    const ctx = rasterContext(this.layer.canvas);
     ctx.save();
     if (this.selection) {
       const { x, y, w, h } = this.selection;
@@ -214,7 +215,7 @@ export class ArtDocument {
   }
   composite(paper = false) {
     const c = surface(this.width, this.height),
-      ctx = c.getContext('2d')!;
+      ctx = rasterContext(c);
     if (paper) {
       ctx.fillStyle = '#fff';
       ctx.fillRect(0, 0, this.width, this.height);
@@ -271,14 +272,38 @@ export class ArtDocument {
       )
         throw new Error('invalidProject');
       // Validate PNG dimensions before decoding to prevent compressed oversized images.
-      const header = atob(l.png.slice(22, 66));
+      const header = atob(l.png.slice(22));
       const u32 = (i: number) =>
         header.charCodeAt(i) * 16777216 +
         (header.charCodeAt(i + 1) << 16) +
         (header.charCodeAt(i + 2) << 8) +
         header.charCodeAt(i + 3);
-      if (header.slice(1, 4) !== 'PNG' || u32(16) !== p.width || u32(20) !== p.height)
+      if (
+        header.slice(0, 8) !== '\x89PNG\r\n\x1a\n' ||
+        u32(8) !== 13 ||
+        header.slice(12, 16) !== 'IHDR' ||
+        u32(16) !== p.width ||
+        u32(20) !== p.height
+      )
         throw new Error('invalidProject');
+      // Chromium can decode incomplete PNGs without rejecting them. Require a
+      // complete chunk stream before allowing any imported document replacement.
+      let offset = 8,
+        hasData = false,
+        complete = false;
+      while (offset + 12 <= header.length) {
+        const length = u32(offset);
+        const type = header.slice(offset + 4, offset + 8);
+        const next = offset + length + 12;
+        if (next > header.length) throw new Error('invalidProject');
+        if (type === 'IDAT') hasData = true;
+        if (type === 'IEND') {
+          complete = length === 0 && next === header.length && hasData;
+          break;
+        }
+        offset = next;
+      }
+      if (!complete) throw new Error('invalidProject');
       ids.add(l.id);
     }
     if (!ids.has(p.active)) throw new Error('invalidProject');
@@ -289,7 +314,7 @@ export class ArtDocument {
       img.src = l.png;
       await img.decode();
       const canvas = surface(p.width, p.height);
-      canvas.getContext('2d')!.drawImage(img, 0, 0);
+      rasterContext(canvas).drawImage(img, 0, 0);
       doc.layers.push({
         id: l.id,
         name: l.name,

@@ -11,4 +11,10 @@
 
 > Use case: logo-brand. Asset type: Windows desktop application icon for X Artist, a drawing and illustration studio. Create one square 1024x1024 icon: a bold, beautifully balanced abstract X made from two confident ivory brush strokes, one stroke tapering subtly into a brush nib, on a solid dark gunmetal rounded-square tile with a restrained warm copper detail. Contemporary minimal flat graphic, crisp strong silhouette readable at 24px, centered with generous padding. No lettering, no words, no blue, no mockup, no scene, no drop shadow outside the tile. Background fully opaque dark gunmetal. Professional, calm and tactile.
 
-Toolbar symbols are project-native SVG line icons. Brush previews are drawn by the application's actual brush engine. `docs/studio.png` is a screenshot of the functioning application, not an AI mockup.
+## Toolbar icons
+
+The application ships 33 transparent 96 × 96 PNG symbols in `public/icons/`. They are raster renditions of the original project-owned line symbols, converted when the product specification changed to raster-only icon assets. Runtime icon markup uses PNG images; no vector icon markup or vector icon assets are shipped. The application icon remains fully opaque. Integration tests inspect the actual pixel alpha of both kinds of asset.
+
+Two generated atlas experiments were rejected because of visible background artifacts; they are not application assets. The final minimal toolbar symbols retain consistent silhouettes and clean transparent backgrounds.
+
+Brush previews are drawn by the application's actual brush engine. `docs/studio.png` is a screenshot of the functioning application, not an AI mockup.

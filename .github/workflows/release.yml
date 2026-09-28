@@ -29,10 +29,12 @@ jobs:
       - run: npm test
       - run: node --test scripts/publish-release.test.mjs
       - run: node scripts/desktop-smoke.mjs
+        timeout-minutes: 3
       - run: npm run dist
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - run: node scripts/desktop-smoke.mjs "release/win-unpacked/X Artist.exe"
+        timeout-minutes: 3
       - name: Checksum
         shell: pwsh
         run: |

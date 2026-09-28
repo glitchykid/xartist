@@ -1,3 +1,4 @@
+import { rasterContext } from './raster';
 import './style.css';
 import { ArtDocument, surface } from './document';
 import type { Blend, Rect } from './document';
@@ -302,7 +303,7 @@ class Studio {
         row.dataset.layerId = l.id;
         row.innerHTML = `${button('visibility:' + l.id, 'visibility', 'eye', `class="visibility ${!l.visible ? 'muted' : ''}" aria-pressed="${l.visible}"`)}<button class="layer-select" data-action="layer:${l.id}"><canvas width="80" height="60" class="layer-thumb"></canvas><span class="layer-name"></span></button>${button('lock:' + l.id, 'lock', l.locked ? 'lock' : 'unlock', `class="layer-lock ${l.locked ? 'locked' : ''}" aria-pressed="${l.locked}"`)}`;
         row.querySelector('.layer-name')!.textContent = l.name;
-        row.querySelector('canvas')!.getContext('2d')!.drawImage(l.canvas, 0, 0, 80, 60);
+        rasterContext(row.querySelector('canvas')!).drawImage(l.canvas, 0, 0, 80, 60);
         row.querySelector('.layer-select')!.addEventListener('dblclick', () => this.rename());
         return row;
       }),
@@ -326,14 +327,14 @@ class Studio {
       canvas.width = this.doc.width;
       canvas.height = this.doc.height;
     }
-    const ctx = canvas.getContext('2d')!;
+    const ctx = rasterContext(canvas);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (this.paper) {
       ctx.fillStyle = '#fff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
     if (this.stroke && this.working) {
-      const c = this.working.getContext('2d')!;
+      const c = rasterContext(this.working);
       c.clearRect(0, 0, canvas.width, canvas.height);
       c.drawImage(this.doc.layer.canvas, 0, 0);
       c.save();
@@ -353,7 +354,7 @@ class Studio {
     const overlay = $<HTMLCanvasElement>('#selection');
     overlay.width = this.doc.width;
     overlay.height = this.doc.height;
-    const c = overlay.getContext('2d')!;
+    const c = rasterContext(overlay);
     const r = this.doc.selection;
     if (r) {
       c.lineWidth = 1 / this.zoom;
@@ -436,13 +437,13 @@ class Studio {
           this.moveSource = this.moveSelection || { x: 0, y: 0, w: this.doc.width, h: this.doc.height };
           const r = this.moveSource;
           this.moving = surface(r.w, r.h);
-          this.moving.getContext('2d')!.drawImage(this.doc.layer.canvas, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
+          rasterContext(this.moving).drawImage(this.doc.layer.canvas, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
         } else {
           this.gesture = 'draw';
           this.erased = this.tool === 'eraser' || (e.buttons & 32) !== 0 || e.button === 5;
           this.strokeSurface.width = this.doc.width;
           this.strokeSurface.height = this.doc.height;
-          const ctx = this.strokeSurface.getContext('2d')!;
+          const ctx = rasterContext(this.strokeSurface);
           if (this.doc.selection) {
             const r = this.doc.selection;
             ctx.beginPath();
@@ -507,7 +508,7 @@ class Studio {
       const r = this.moveSource!,
         dx = Math.round(p.x - this.start.x),
         dy = Math.round(p.y - this.start.y);
-      const c = this.working!.getContext('2d')!;
+      const c = rasterContext(this.working!);
       c.putImageData(this.before, 0, 0);
       c.clearRect(r.x, r.y, r.w, r.h);
       c.drawImage(this.moving!, r.x + dx, r.y + dy);
@@ -525,7 +526,7 @@ class Studio {
       if (this.gesture === 'move' && this.last.x === this.start.x && this.last.y === this.start.y)
         this.working = null;
       if (this.working) {
-        const c = this.doc.layer.canvas.getContext('2d')!;
+        const c = rasterContext(this.doc.layer.canvas);
         c.clearRect(0, 0, this.doc.width, this.doc.height);
         c.drawImage(this.working, 0, 0);
         this.doc.commitPixels(this.before);
@@ -581,7 +582,7 @@ class Studio {
     $<HTMLInputElement>('#hue').value = String(this.hsv.h);
   }
   private pick(p: Sample) {
-    const c = this.doc.composite(this.paper).getContext('2d')!;
+    const c = rasterContext(this.doc.composite(this.paper));
     const d = c.getImageData(
       Math.min(this.doc.width - 1, Math.max(0, Math.floor(p.x))),
       Math.min(this.doc.height - 1, Math.max(0, Math.floor(p.y))),
@@ -645,7 +646,7 @@ class Studio {
   private previews() {
     document.querySelectorAll<HTMLCanvasElement>('[data-brush-preview]').forEach((c) => {
       const kind = c.dataset.brushPreview as BrushId;
-      const context = c.getContext('2d')!;
+      const context = rasterContext(c);
       const points = Array.from({ length: 100 }, (_, i) => ({
         x: 12 + i * 3.15,
         y: 34 + Math.sin(i * 0.07) * 11,
@@ -777,11 +778,11 @@ class Studio {
     }
     const before = this.doc.capture(),
       original = surface(this.doc.width, this.doc.height);
-    original.getContext('2d')!.putImageData(before, 0, 0);
+    rasterContext(original).putImageData(before, 0, 0);
     const selection = this.doc.selection ? { ...this.doc.selection } : null;
     const r = selection || { x: 0, y: 0, w: this.doc.width, h: this.doc.height };
     const cropped = surface(r.w, r.h);
-    cropped.getContext('2d')!.drawImage(original, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
+    rasterContext(cropped).drawImage(original, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
     this.working = surface(this.doc.width, this.doc.height);
     this.modal(
       kind,
@@ -789,7 +790,7 @@ class Studio {
     );
     const update = () => {
       if (!this.working) return;
-      const c = this.working.getContext('2d')!;
+      const c = rasterContext(this.working);
       c.clearRect(0, 0, this.doc.width, this.doc.height);
       c.drawImage(original, 0, 0);
       c.clearRect(r.x, r.y, r.w, r.h);
@@ -827,7 +828,7 @@ class Studio {
       update();
     };
     $('#inspector-apply').onclick = () => {
-      const c = this.doc.layer.canvas.getContext('2d')!;
+      const c = rasterContext(this.doc.layer.canvas);
       c.clearRect(0, 0, this.doc.width, this.doc.height);
       c.drawImage(this.working!, 0, 0);
       this.working = null;
@@ -869,7 +870,7 @@ class Studio {
   private preferences() {
     this.modal(
       'settings',
-      `<label class="text-field">${t('language')}<select id="language">${locales.map((l, i) => `<option value="${l}" ${l === locale ? 'selected' : ''}>${languages[i]}</option>`).join('')}</select></label><p class="dialog-copy">${t('penHint')}</p><p class="settings-about">X Artist 0.1.1 · MIT<br>Electron 44 · Canvas 2D</p>`,
+      `<label class="text-field">${t('language')}<select id="language">${locales.map((l, i) => `<option value="${l}" ${l === locale ? 'selected' : ''}>${languages[i]}</option>`).join('')}</select></label><p class="dialog-copy">${t('penHint')}</p><p class="settings-about">X Artist 0.1.2 · MIT<br>Electron 44 · Canvas 2D</p>`,
     );
     $<HTMLSelectElement>('#language').onchange = (e) => {
       setLocale((e.target as HTMLSelectElement).value as Locale);
@@ -920,7 +921,7 @@ class Studio {
     try {
       const c = surface(this.doc.width, this.doc.height);
       const scale = Math.min(c.width / image.width, c.height / image.height, 1);
-      c.getContext('2d')!.drawImage(
+      rasterContext(c).drawImage(
         image,
         (c.width - image.width * scale) / 2,
         (c.height - image.height * scale) / 2,
@@ -1132,10 +1133,12 @@ class Studio {
     }
     if (e.code === 'BracketLeft' || e.code === 'BracketRight') {
       e.preventDefault();
-      this.settings.size = Math.min(
-        300,
-        Math.max(1, Math.round(this.settings.size * (e.code === 'BracketRight' ? 1.2 : 1 / 1.2))),
-      );
+      const current = this.settings.size;
+      const next =
+        e.code === 'BracketRight'
+          ? Math.max(current + 1, Math.round(current * 1.2))
+          : Math.min(current - 1, Math.round(current / 1.2));
+      this.settings.size = Math.min(300, Math.max(1, next));
       $<HTMLInputElement>('#size').value = String(this.settings.size);
       $('#size-value').textContent = this.settings.size + ' px';
     }

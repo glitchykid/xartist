@@ -7,13 +7,16 @@ const directory = path.resolve('.tools/desktop-check');
 await fs.mkdir(directory, { recursive: true });
 const executablePath = process.argv[2];
 const app = await electron.launch({
+  timeout: 60000,
   ...(executablePath
     ? { executablePath, args: ['--user-data-dir=' + path.join(directory, 'profile')] }
     : { args: ['.', '--user-data-dir=' + path.join(directory, 'profile')] }),
   env: { ...process.env, ELECTRON_RUN_AS_NODE: undefined },
 });
 try {
-  const page = await app.firstWindow();
+  const page = await app.firstWindow({ timeout: 30000 });
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1280, 800));
+  page.setDefaultTimeout(30000);
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.waitForSelector('#artwork');
@@ -35,7 +38,7 @@ try {
     dialog.showSaveDialog = async () => ({ canceled: false, filePath });
   }, pngPath);
   await page.locator('[data-action="export"]').click();
-  await page.waitForTimeout(500);
+  await page.waitForFunction(() => document.querySelector('#toast').textContent.includes('PNG'));
   assert.equal((await fs.readFile(pngPath)).subarray(1, 4).toString(), 'PNG');
   await page.locator('[data-action="new"]').click();
   await page.locator('#new-form .primary').click();
@@ -58,7 +61,8 @@ try {
     dialog.showMessageBox = async () => ({ response: 2 });
   });
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].close());
-  assert.equal(await page.locator('.layer-row').count(), 2);
+  assert.equal(app.windows().length, 1);
+  assert.equal(await page.locator('.layer-row.active').count(), 1);
   assert.deepEqual(errors, []);
   await page.screenshot({ path: path.join(directory, 'desktop.png') });
   console.log(
@@ -67,6 +71,13 @@ try {
   await app.evaluate(({ dialog }) => {
     dialog.showMessageBox = async () => ({ response: 1 });
   });
+} catch (error) {
+  console.error(`::error::Desktop check failed: ${String(error.message).replaceAll('\n', '%0A')}`);
+  throw error;
 } finally {
+  // This is an isolated test profile. Never let an unsaved-work dialog trap CI cleanup.
+  await app
+    .evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().forEach((win) => win.destroy()))
+    .catch(() => {});
   await app.close();
 }

@@ -6,7 +6,7 @@ Validated on Windows 10 x64 with Node.js 24.21.0 LTS, Electron 44.4.5 and Micros
 
 `npm run build` passes strict TypeScript checking and produces the bundled application.
 
-`npm test`: **17 integration tests passed**. These assert rendered pixel changes, not just the presence of buttons:
+`npm test`: **24 integration tests**. These assert rendered pixel changes, not just the presence of buttons:
 
 1. Complete initial UI with eight brushes, one layer and no runtime errors or horizontal overflow.
 2. Drawing, undo and redo restore expected pixels.
@@ -25,6 +25,23 @@ Validated on Windows 10 x64 with Node.js 24.21.0 LTS, Electron 44.4.5 and Micros
 15. Moving selected pixels leaves unselected pixels untouched.
 16. At a 1040 × 681 content viewport (accounting for native window decorations), all panels and dialogs fit without scrolling in all six languages.
 17. All 24 layers are reachable using page controls; resizing keeps the active layer visible.
+18. Brush-size shortcuts advance at 1 and 2 px and clamp at both the 1 and 300 px limits.
+19. A canceled pen stroke does not change saved pixels or add undo history.
+20. A new edit after undo removes the abandoned redo branch.
+21. Canceling document replacement preserves unsaved artwork.
+22. Missing/duplicate layer IDs, out-of-range/null opacity and truncated PNG data cannot replace a valid project.
+23. Every displayed toolbar icon is a loadable transparent PNG; the application icon is fully opaque.
+24. Brush edges contain intermediate shades and the artwork display has high-quality image smoothing enabled.
+
+## TDD regression record
+
+The brush-size boundary test was added before changing the shortcut implementation. It failed with `Expected: 2; Received: 1` for the 1 px → increase transition. The implementation then added a minimum one-pixel step while retaining proportional increments and the existing limits. New changes should follow the same red → green → refactor cycle.
+
+The truncated-PNG regression also failed first: Chromium accepted an incomplete PNG and the project could replace existing artwork with a blank layer. The parser now requires a complete PNG chunk stream through IEND before decoding. Raster-icon and smoothing tests failed against the old vector markup and default low-quality interpolation before the PNG migration and shared high-quality rendering context were implemented.
+
+Tests run their own server on port 5187 with server reuse disabled, so another local application's development server cannot accidentally become the test target. The desktop harness has explicit timeouts and force-cleans only its isolated test window, even if the unsaved-work protection is active.
+
+These are risk-based boundary and state-transition checks, not a claim that every possible environment or hardware combination has been covered.
 
 `node scripts/desktop-smoke.mjs` passes. It launches the actual Electron application, verifies a secure context with no renderer Node access, tests save/open/PNG through the native bridge using real temporary files, confirms canceled saves preserve the dirty state, and checks canceling the unsaved-close dialog. Dialog responses are substituted in the test process only; filesystem operations use the production implementation.
 
@@ -42,6 +59,7 @@ The same desktop smoke check also passed against the packaged `release/win-unpac
 
 - [Electron security](https://www.electronjs.org/docs/latest/tutorial/security): secure protocol, sandbox, context isolation and a narrow validated IPC bridge.
 - [PointerEvent](https://developer.mozilla.org/en-US/docs/Web/API/PointerEvent): pressure, tilt, hardware pointer type and coalesced input.
+- [Canvas image smoothing](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/imageSmoothingQuality): high-quality raster interpolation in the bundled Chromium renderer, separate from input path stabilization.
 - [Vite guide](https://vite.dev/guide/): current stable build tool setup.
 - [Node.js releases](https://nodejs.org/en/about/previous-releases): Node 24 LTS baseline.
 - [electron-builder Windows targets](https://www.electron.build/win/): portable executable packaging.
