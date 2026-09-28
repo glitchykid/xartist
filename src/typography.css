@@ -1,0 +1,10 @@
+/* System typography keeps the editor offline and supports all six UI languages. */
+:lang(ko) {
+  font-family: 'Malgun Gothic', 'Segoe UI', sans-serif;
+}
+:lang(ja) {
+  font-family: 'Yu Gothic UI', 'Segoe UI', sans-serif;
+}
+:lang(zh) {
+  font-family: 'Microsoft YaHei UI', 'Segoe UI', sans-serif;
+}

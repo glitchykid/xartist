@@ -1,0 +1,46 @@
+{
+  "name": "xartist",
+  "version": "0.1.0",
+  "description": "A calm, free illustration studio with expressive tablet-aware brushes.",
+  "author": "glitchykid",
+  "license": "MIT",
+  "type": "module",
+  "main": "electron/main.cjs",
+  "engines": {
+    "node": ">=24.21.0 <25"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "start": "npm run build && electron .",
+    "test": "playwright test",
+    "dist": "npm run build && electron-builder --win portable --publish never"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "electron": "44.4.5",
+    "electron-builder": "26.15.3",
+    "typescript": "7.0.2",
+    "vite": "8.3.1"
+  },
+  "build": {
+    "appId": "io.github.glitchykid.xartist",
+    "productName": "X Artist",
+    "electronDist": "node_modules/electron/dist",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "public/icon.png"
+    },
+    "portable": {
+      "artifactName": "X-Artist-${version}-Windows-x64.exe"
+    }
+  }
+}
