@@ -6,7 +6,7 @@ Validated on Windows 10 x64 with Node.js 24.21.0 LTS, Electron 44.4.5 and Micros
 
 `npm run build` passes strict TypeScript checking and produces the bundled application.
 
-`npm test`: **15 integration tests passed**. These assert rendered pixel changes, not just the presence of buttons:
+`npm test`: **17 integration tests passed**. These assert rendered pixel changes, not just the presence of buttons:
 
 1. Complete initial UI with eight brushes, one layer and no runtime errors or horizontal overflow.
 2. Drawing, undo and redo restore expected pixels.
@@ -23,10 +23,12 @@ Validated on Windows 10 x64 with Node.js 24.21.0 LTS, Electron 44.4.5 and Micros
 13. Switching among all six languages preserves artwork.
 14. IndexedDB recovery restores the previous session.
 15. Moving selected pixels leaves unselected pixels untouched.
+16. At a 1040 × 681 content viewport (accounting for native window decorations), all panels and dialogs fit without scrolling in all six languages.
+17. All 24 layers are reachable using page controls; resizing keeps the active layer visible.
 
 `node scripts/desktop-smoke.mjs` passes. It launches the actual Electron application, verifies a secure context with no renderer Node access, tests save/open/PNG through the native bridge using real temporary files, confirms canceled saves preserve the dirty state, and checks canceling the unsaved-close dialog. Dialog responses are substituted in the test process only; filesystem operations use the production implementation.
 
-The interface was also opened with agent-browser and visually inspected. No runtime errors or Vite error overlay were detected. A screenshot is in `docs/studio.png`.
+The interface was also opened with agent-browser and visually inspected. No runtime errors or Vite error overlay were detected. Screenshots are in `docs/studio.png` and `docs/studio-compact-ru.png`.
 
 The same desktop smoke check also passed against the packaged `release/win-unpacked/X Artist.exe`. The portable Windows artifact was built successfully, with the generated icon embedded, and its Authenticode status is `NotSigned`. A SHA-256 checksum accompanies the release.
 

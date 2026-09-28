@@ -27,6 +27,7 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm test
+      - run: node --test scripts/publish-release.test.mjs
       - run: node scripts/desktop-smoke.mjs
       - run: npm run dist
         env:
@@ -51,6 +52,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          $assets = Get-ChildItem release/*.exe | ForEach-Object { $_.FullName }
-          gh release create $env:RELEASE_TAG @assets release/SHA256SUMS.txt --verify-tag --prerelease --title "X Artist $env:RELEASE_TAG" --notes-file docs/RELEASE_NOTES.md
+        run: node scripts/publish-release.mjs

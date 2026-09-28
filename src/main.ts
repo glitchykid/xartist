@@ -28,7 +28,7 @@ const button = (action: string, key: Key, glyph: string, extra = '', shortcut = 
 const range = (id: string, key: Key, min: number, max: number, value: number, unit = '', step = 1) =>
   `<label class="range-field" for="${id}"><span>${t(key)}</span><output id="${id}-value">${value}${unit}</output><input id="${id}" type="range" min="${min}" max="${max}" step="${step}" value="${value}" data-unit="${unit}"></label>`;
 const swatches = [
-  '#292d2e',
+  '#2d2b29',
   '#555b59',
   '#8b9188',
   '#dedbd0',
@@ -48,7 +48,7 @@ class Studio {
     kind: 'ink',
     size: 9,
     opacity: 1,
-    color: '#292d2e',
+    color: '#2d2b29',
     stabilization: 25,
     smoothing: 35,
     pressure: true,
@@ -79,6 +79,7 @@ class Studio {
   private recoveryTimer = 0;
   private toastTimer = 0;
   private hasMarks = false;
+  private layerPage = 0;
   private savedRecovery: string | undefined;
   private inspectorCancel: (() => void) | null = null;
   constructor() {
@@ -86,7 +87,10 @@ class Studio {
     this.mount();
     this.bindDocument();
     this.fit();
-    window.addEventListener('resize', () => this.fit());
+    window.addEventListener('resize', () => {
+      this.fit();
+      this.refresh(true);
+    });
     window.addEventListener('keydown', (e) => this.key(e));
     window.addEventListener('keyup', (e) => {
       if (e.code === 'Space') {
@@ -137,7 +141,7 @@ class Studio {
           <div class="canvas-controls">${button('zoom-out', 'zoom', 'minus')}<button data-action="actual" id="zoom-label">100%</button>${button('zoom-in', 'zoom', 'plus')}<span class="divider"></span>${button('fit', 'fit', 'fit')}</div></div>
       </main>
       <aside class="right-panel"><section class="color-panel"><div class="panel-heading">${t('color')}<span id="hex-value">${this.settings.color.toUpperCase()}</span></div><div id="color-field" role="slider" tabindex="0" aria-label="${t('color')}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="color-point"></span></div><input id="hue" type="range" min="0" max="359" value="20" aria-label="${t('color')}" class="hue"><div class="color-value"><label class="color-chip"><input id="color-picker" type="color" value="${this.settings.color}" aria-label="${t('color')}"></label><input id="hex" value="${this.settings.color}" aria-label="HEX" maxlength="7"><button data-action="tool:eyedropper" title="${t('eyedropper')}">${icon('eyedropper', 16)}</button></div><div class="palette-label">${t('palette')}</div><div class="swatches">${swatches.map((c) => `<button style="--swatch:${c}" data-color="${c}" title="${c}" aria-label="${c}"></button>`).join('')}</div></section>
-        <section class="layers-panel"><div class="panel-heading"><span>${t('layers')}</span>${button('add-layer', 'addLayer', 'plus')}</div><div class="layer-options"><select id="blend" aria-label="${t('blend')}">${(['source-over', 'multiply', 'screen', 'overlay'] as Blend[]).map((v) => `<option value="${v}">${t(v === 'source-over' ? 'normal' : v)}</option>`).join('')}</select><label class="layer-alpha" title="${t('opacity')}"><input id="layer-opacity" type="number" min="0" max="100" value="100" aria-label="${t('opacity')}"><span>%</span></label></div><div id="layers"></div><div class="layer-actions">${button('duplicate', 'duplicate', 'duplicate')}${button('up', 'up', 'up')}${button('down', 'down', 'down')}<span></span>${button('delete-layer', 'delete', 'delete')}</div></section>
+        <section class="layers-panel"><div class="panel-heading"><span>${t('layers')}</span>${button('add-layer', 'addLayer', 'plus')}</div><div class="layer-options"><select id="blend" aria-label="${t('blend')}">${(['source-over', 'multiply', 'screen', 'overlay'] as Blend[]).map((v) => `<option value="${v}">${t(v === 'source-over' ? 'normal' : v)}</option>`).join('')}</select><label class="layer-alpha" title="${t('opacity')}"><input id="layer-opacity" type="number" min="0" max="100" value="100" aria-label="${t('opacity')}"><span>%</span></label></div><div id="layers"></div><div class="layer-actions">${button('duplicate', 'duplicate', 'duplicate')}${button('up', 'up', 'up')}${button('down', 'down', 'down')}<div class="layer-pager">${button('page-prev', 'previousPage', 'left')}<span id="layer-page" aria-live="polite">1/1</span>${button('page-next', 'nextPage', 'right')}</div>${button('delete-layer', 'delete', 'delete')}</div></section>
         <div class="paper-setting"><label for="paper">${t('background')}</label><select id="paper"><option value="white" ${this.paper ? 'selected' : ''}>${t('paper')}</option><option value="transparent" ${!this.paper ? 'selected' : ''}>${t('transparent')}</option></select></div>
         <div class="pen-panel" title="${t('penHint')}"><div><span class="status-led"></span><strong id="device">${t('mouse')}</strong><span id="pressure-number">0%</span></div><div class="meter"><i id="pressure-meter"></i></div><p><span id="tilt-number">0° / 0°</span><span>Windows Ink</span></p></div>
       </aside></div><footer class="statusbar"><span class="status-led"></span><span id="status">${t('essentials')}</span><span class="footer-tip"><kbd>[</kbd> <kbd>]</kbd> ${t('size')} <span>·</span> <kbd>Space</kbd> ${t('hand')}</span><span id="selection-info"></span><span>sRGB · 8 bit</span></footer>
@@ -234,7 +238,7 @@ class Studio {
   private bindDocument() {
     this.doc.onChange = () => {
       this.hasMarks = true;
-      this.refresh();
+      this.refresh(true);
       this.render();
       this.syncDirty();
       clearTimeout(this.recoveryTimer);
@@ -272,19 +276,27 @@ class Studio {
     this.strokeSurface = surface(doc.width, doc.height);
     this.working = null;
     this.bindDocument();
-    this.refresh();
+    this.refresh(true);
     this.fit();
     this.syncDirty();
   }
-  private refresh() {
+  private refresh(revealActive = false) {
     $('#document-name').textContent = this.doc.name + (this.doc.dirty ? ' •' : '');
     $('#document-size').textContent = `${this.doc.width} × ${this.doc.height} px`;
     $<HTMLButtonElement>('#undo').disabled = !this.doc.canUndo;
     $<HTMLButtonElement>('#redo').disabled = !this.doc.canRedo;
     $<HTMLButtonElement>('#deselect').disabled = !this.doc.selection;
     $('#empty-hint').hidden = this.hasMarks;
+    const ordered = [...this.doc.layers].reverse();
+    const rows = Math.max(1, Math.floor($('#layers').clientHeight / 43));
+    const pages = Math.max(1, Math.ceil(ordered.length / rows));
+    if (revealActive) this.layerPage = Math.floor(ordered.findIndex((l) => l.id === this.doc.active) / rows);
+    this.layerPage = Math.max(0, Math.min(pages - 1, this.layerPage));
+    $('#layer-page').textContent = `${this.layerPage + 1}/${pages}`;
+    $<HTMLButtonElement>('[data-action="page-prev"]').disabled = this.layerPage === 0;
+    $<HTMLButtonElement>('[data-action="page-next"]').disabled = this.layerPage === pages - 1;
     $('#layers').replaceChildren(
-      ...[...this.doc.layers].reverse().map((l) => {
+      ...ordered.slice(this.layerPage * rows, (this.layerPage + 1) * rows).map((l) => {
         const row = document.createElement('div');
         row.className = 'layer-row' + (l.id === this.doc.active ? ' active' : '');
         row.dataset.layerId = l.id;
@@ -681,6 +693,7 @@ class Studio {
   }
   private modal(title: Key, content: string) {
     const dialog = $<HTMLDialogElement>('#dialog');
+    dialog.classList.toggle('wide-dialog', title === 'shortcuts');
     dialog.innerHTML = `<div class="dialog-heading"><h2>${t(title)}</h2><button type="button" id="dialog-close" aria-label="${t('close')}">${icon('close')}</button></div>${content}`;
     $('#dialog-close').onclick = () => this.closeDialog();
     dialog.oncancel = (e) => {
@@ -856,7 +869,7 @@ class Studio {
   private preferences() {
     this.modal(
       'settings',
-      `<label class="text-field">${t('language')}<select id="language">${locales.map((l, i) => `<option value="${l}" ${l === locale ? 'selected' : ''}>${languages[i]}</option>`).join('')}</select></label><p class="dialog-copy">${t('penHint')}</p><p class="settings-about">X Artist 0.1.0 · MIT<br>Electron 44 · Canvas 2D</p>`,
+      `<label class="text-field">${t('language')}<select id="language">${locales.map((l, i) => `<option value="${l}" ${l === locale ? 'selected' : ''}>${languages[i]}</option>`).join('')}</select></label><p class="dialog-copy">${t('penHint')}</p><p class="settings-about">X Artist 0.1.1 · MIT<br>Electron 44 · Canvas 2D</p>`,
     );
     $<HTMLSelectElement>('#language').onchange = (e) => {
       setLocale((e.target as HTMLSelectElement).value as Locale);
@@ -1008,6 +1021,14 @@ class Studio {
           break;
         case 'down':
           this.doc.moveLayer(-1);
+          break;
+        case 'page-prev':
+          this.layerPage--;
+          this.refresh();
+          break;
+        case 'page-next':
+          this.layerPage++;
+          this.refresh();
           break;
         case 'layer':
           this.doc.active = value;

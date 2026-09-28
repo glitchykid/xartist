@@ -1,4 +1,6 @@
 const paths: Record<string, string> = {
+  left: '<path d="m15 5-7 7 7 7"/>',
+  right: '<path d="m9 5 7 7-7 7"/>',
   brush: '<path d="m14 4 6 6M8 16l-2-2L17 3l4 4-11 11-2-2ZM6 15c-4 0-1 5-4 6 5 1 7-1 6-4"/>',
   eraser: '<path d="m3 14 10-11 8 7-10 11H9l-6-5ZM8 9l8 7M11 21h10"/>',
   select: '<rect x="4" y="4" width="16" height="16" rx="1" stroke-dasharray="3 3"/>',

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, protocol, net, session } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, protocol, net, session, nativeTheme } = require('electron');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
@@ -32,6 +32,7 @@ function handler(channel, fn) {
 }
 
 app.whenReady().then(() => {
+  nativeTheme.themeSource = 'dark';
   const root = path.resolve(__dirname, '../dist');
   protocol.handle('xartist', (request) => {
     const url = new URL(request.url);
@@ -45,8 +46,8 @@ app.whenReady().then(() => {
   });
   session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
   win = new BrowserWindow({
-    width: 1480,
-    height: 980,
+    width: 1400,
+    height: 900,
     minWidth: 1040,
     minHeight: 720,
     backgroundColor: '#202425',

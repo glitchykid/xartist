@@ -9,42 +9,36 @@ async function point(page: Page, x: number, y: number) {
 async function stroke(page: Page, x = 200, y = 200, pressure = 1, tiltX = 0) {
   const a = await point(page, x, y),
     b = await point(page, x + 200, y);
-  await page
-    .locator('#viewport')
-    .dispatchEvent('pointerdown', {
+  await page.locator('#viewport').dispatchEvent('pointerdown', {
+    pointerId: 7,
+    pointerType: 'pen',
+    clientX: a.x,
+    clientY: a.y,
+    pressure,
+    tiltX,
+    tiltY: 0,
+    button: 0,
+    buttons: 1,
+  });
+  for (let i = 1; i <= 20; i++)
+    await page.locator('#viewport').dispatchEvent('pointermove', {
       pointerId: 7,
       pointerType: 'pen',
-      clientX: a.x,
+      clientX: a.x + ((b.x - a.x) * i) / 20,
       clientY: a.y,
       pressure,
       tiltX,
       tiltY: 0,
-      button: 0,
       buttons: 1,
     });
-  for (let i = 1; i <= 20; i++)
-    await page
-      .locator('#viewport')
-      .dispatchEvent('pointermove', {
-        pointerId: 7,
-        pointerType: 'pen',
-        clientX: a.x + ((b.x - a.x) * i) / 20,
-        clientY: a.y,
-        pressure,
-        tiltX,
-        tiltY: 0,
-        buttons: 1,
-      });
-  await page
-    .locator('#viewport')
-    .dispatchEvent('pointerup', {
-      pointerId: 7,
-      pointerType: 'pen',
-      clientX: b.x,
-      clientY: b.y,
-      pressure: 0,
-      buttons: 0,
-    });
+  await page.locator('#viewport').dispatchEvent('pointerup', {
+    pointerId: 7,
+    pointerType: 'pen',
+    clientX: b.x,
+    clientY: b.y,
+    pressure: 0,
+    buttons: 0,
+  });
   await expect(page.locator('#undo')).toBeEnabled();
 }
 async function pixel(page: Page, x: number, y: number) {
@@ -72,6 +66,61 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('xartist.locale', 'en'));
   await page.goto('/');
   await expect(page.locator('#artwork')).toHaveAttribute('width', '1280');
+});
+
+test('compact panels and dialogs fit the minimum window in all six languages without scrolling', async ({
+  page,
+}) => {
+  // 720px native window minus the Windows title bar and borders.
+  await page.setViewportSize({ width: 1040, height: 681 });
+  for (const lang of ['ru', 'uk', 'ko', 'ja', 'zh', 'en']) {
+    await page.locator('[data-action="settings"]').click();
+    await page.locator('#language').selectOption(lang);
+    const overflow = await page.evaluate(() => {
+      const selectors = [
+        '.topbar',
+        '.options',
+        '.toolbar',
+        '.left-panel',
+        '.right-panel',
+        '.layers-panel',
+        '#layers',
+      ];
+      return selectors.filter((selector) => {
+        const e = document.querySelector(selector)!;
+        return e.scrollHeight > e.clientHeight + 1 || e.scrollWidth > e.clientWidth + 1;
+      });
+    });
+    expect(overflow, lang).toEqual([]);
+    const curve = await page.locator('.pressure-curve').boundingBox();
+    expect(curve!.y + curve!.height).toBeLessThan(660);
+    await page.locator('[data-action="help"]').click();
+    expect(await page.locator('#dialog').evaluate((e) => e.scrollHeight <= e.clientHeight + 1)).toBeTruthy();
+    await page.locator('#dialog-close').click();
+  }
+  await page.locator('[data-action="settings"]').click();
+  await page.locator('#language').selectOption('ru');
+  await page.screenshot({ path: '.tools/studio-compact-ru.png' });
+});
+
+test('all 24 layers remain reachable through paging without panel scrolling', async ({ page }) => {
+  await page.setViewportSize({ width: 1040, height: 681 });
+  for (let i = 1; i < 24; i++) await page.locator('[data-action="add-layer"]').click();
+  await expect(page.locator('[data-action="add-layer"]')).toBeDisabled();
+  const seen = new Set<string>();
+  for (let i = 0; i < 24; i++) {
+    const ids = await page
+      .locator('.layer-row')
+      .evaluateAll((rows) => rows.map((row) => (row as HTMLElement).dataset.layerId!));
+    ids.forEach((id) => seen.add(id));
+    expect(await page.locator('#layers').evaluate((e) => e.scrollHeight <= e.clientHeight + 1)).toBeTruthy();
+    if (!(await page.locator('[data-action="page-next"]').isEnabled())) break;
+    await page.locator('[data-action="page-next"]').click();
+  }
+  expect(seen.size).toBe(24);
+  await page.locator('.layer-select').last().click();
+  await page.setViewportSize({ width: 1480, height: 980 });
+  await expect(page.locator('.layer-row.active')).toBeVisible();
 });
 
 test('loads a complete studio without runtime errors or overflow', async ({ page }) => {
@@ -215,13 +264,11 @@ test('project save and reopen preserves pixels and layer properties', async ({ p
   expect(project.layers[1].opacity).toBe(0.65);
   await page.locator('[data-action="new"]').click();
   await page.locator('#new-form .primary').click();
-  await page
-    .locator('#project-input')
-    .setInputFiles({
-      name: 'test.xartist',
-      mimeType: 'application/json',
-      buffer: Buffer.from(JSON.stringify(project)),
-    });
+  await page.locator('#project-input').setInputFiles({
+    name: 'test.xartist',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(project)),
+  });
   await expect(page.locator('.layer-row')).toHaveCount(2);
   const reopened = await saveProject(page);
   expect(reopened).toEqual(project);
@@ -235,13 +282,11 @@ test('rejects corrupt or malicious projects without losing artwork', async ({ pa
     { ...project, width: 9000 },
     { ...project, layers: [{ ...project.layers[0], id: '"><img src=x>' }] },
   ]) {
-    await page
-      .locator('#project-input')
-      .setInputFiles({
-        name: 'bad.xartist',
-        mimeType: 'application/json',
-        buffer: Buffer.from(JSON.stringify(corrupt)),
-      });
+    await page.locator('#project-input').setInputFiles({
+      name: 'bad.xartist',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify(corrupt)),
+    });
     await expect(page.locator('#toast')).toHaveClass('show');
     expect(await pixel(page, 300, 200)).not.toEqual([255, 255, 255, 255]);
   }

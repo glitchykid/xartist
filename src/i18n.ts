@@ -3,6 +3,15 @@ export type Locale = (typeof locales)[number];
 export const languages = ['English', 'Русский', 'Українська', '한국어', '日本語', '简体中文'];
 // Every row has the same locale order; keeping translations together prevents missing keys.
 const messages = {
+  previousPage: [
+    'Previous layers',
+    'Предыдущие слои',
+    'Попередні шари',
+    '이전 레이어',
+    '前のレイヤー',
+    '上一页图层',
+  ],
+  nextPage: ['Next layers', 'Следующие слои', 'Наступні шари', '다음 레이어', '次のレイヤー', '下一页图层'],
   studio: [
     'Illustration studio',
     'Студия иллюстрации',

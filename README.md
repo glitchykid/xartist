@@ -4,14 +4,15 @@ A free, offline illustration studio for artists who want a quieter workspace. X 
 
 ![X Artist studio](docs/studio.png)
 
-**Status: 0.1.0 — early preview for Windows x64.** This is a working illustration editor, not a full replacement for Photoshop or Krita. Animation and comic layout tools are future work; the first release prioritizes drawing, selections, transformations and color adjustments.
+**Status: 0.1.1 — early preview for Windows x64.** This is a working illustration editor, not a full replacement for Photoshop or Krita. Animation and comic layout tools are future work; the first release prioritizes drawing, selections, transformations and color adjustments.
 
 ## Download and run
 
-Download `X-Artist-0.1.0-Windows-x64.exe` from [GitHub Releases](https://github.com/glitchykid/xartist/releases). It is a portable application: no installation, account or subscription is required. The executable is not code-signed. Windows may display an unknown-publisher prompt.
+Download `X-Artist-0.1.1-Windows-x64.exe` from [GitHub Releases](https://github.com/glitchykid/xartist/releases). It is a portable application: no installation, account or subscription is required. The executable is not code-signed. Windows may display an unknown-publisher prompt.
 
 ## What works
 
+- Dense, scroll-free controls that fit a 1040 × 720 Windows window, including its title bar. The layer list uses pages, and the shortcut reference uses two columns. All six languages are checked at the minimum size.
 - Eight raster brushes: studio ink, graphite, round paint, chisel marker, soft airbrush, dry chalk, soft wash and screentone. Brush previews are rendered with the actual brush engine.
 - Brush size, stroke opacity, independent stabilization and smoothing, adjustable pressure curve, and tilt-dependent tip shape. Opacity applies to the whole stroke rather than accumulating to opaque at overlapping dabs.
 - Windows Ink pen pressure and tilt through Pointer Events, coalesced input samples, hardware eraser input, mouse drawing and touch panning.
@@ -66,7 +67,7 @@ Use **Node.js 24 LTS** (24.21.0 or newer in the 24.x line). The initial release 
 npm ci
 npm run dev          # browser development at http://127.0.0.1:5173
 npm start            # build and launch the desktop application
-npm test             # 15 browser integration tests; Microsoft Edge must be installed
+npm test             # 17 browser integration tests; Microsoft Edge must be installed
 npm run build
 node scripts/desktop-smoke.mjs  # desktop file I/O and isolation checks after building
 npm run dist         # portable Windows x64 executable in release/
