@@ -68,6 +68,143 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator('#artwork')).toHaveAttribute('width', '1280');
 });
 
+test('toolbar icons are transparent raster images and the application icon is opaque', async ({ page }) => {
+  expect(await page.locator('button svg').count()).toBe(0);
+  const paths = await page
+    .locator('.raster-icon')
+    .evaluateAll((elements) => [...new Set(elements.map((el) => (el as HTMLImageElement).src))]);
+  expect(paths.length).toBeGreaterThan(20);
+  for (const path of [...paths, '/icon.png']) {
+    const result = await page.evaluate(async (src) => {
+      const image = new Image();
+      image.src = src;
+      await image.decode();
+      const canvas = document.createElement('canvas');
+      canvas.width = image.width;
+      canvas.height = image.height;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(image, 0, 0);
+      const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      let transparent = 0,
+        opaque = 0;
+      for (let i = 3; i < pixels.length; i += 4) {
+        if (pixels[i] === 0) transparent++;
+        if (pixels[i] === 255) opaque++;
+      }
+      return { transparent, opaque, count: pixels.length / 4 };
+    }, path);
+    if (path === '/icon.png') expect(result.opaque).toBe(result.count);
+    else {
+      expect(path).toMatch(/\.png$/);
+      expect(result.transparent).toBeGreaterThan(result.count / 2);
+      expect(result.opaque).toBeGreaterThan(0);
+    }
+  }
+});
+
+test('brush edges are antialiased and the display uses high-quality image smoothing', async ({ page }) => {
+  await page.locator('[data-action="brush:round"]').click();
+  await setRange(page, 'size', 19);
+  await stroke(page, 200, 200);
+  const result = await page.locator('#artwork').evaluate((canvas: HTMLCanvasElement) => {
+    const ctx = canvas.getContext('2d')!;
+    const pixels = ctx.getImageData(290, 180, 20, 40).data;
+    const values = new Set<number>();
+    for (let i = 0; i < pixels.length; i += 4) values.add(pixels[i]);
+    return { shades: values.size, enabled: ctx.imageSmoothingEnabled, quality: ctx.imageSmoothingQuality };
+  });
+  expect(result.shades).toBeGreaterThan(3);
+  expect(result.enabled).toBe(true);
+  expect(result.quality).toBe('high');
+});
+
+test('brush-size shortcuts progress at the minimum and clamp at both limits', async ({ page }) => {
+  await setRange(page, 'size', 1);
+  await page.locator('#viewport').focus();
+  await page.keyboard.press(']');
+  await expect(page.locator('#size')).toHaveValue('2');
+  await page.keyboard.press(']');
+  await expect(page.locator('#size')).toHaveValue('3');
+  await setRange(page, 'size', 1);
+  await page.keyboard.press('[');
+  await expect(page.locator('#size')).toHaveValue('1');
+  await setRange(page, 'size', 300);
+  await page.keyboard.press(']');
+  await expect(page.locator('#size')).toHaveValue('300');
+});
+
+test('canceling a pen stroke restores pixels and does not add history', async ({ page }) => {
+  const a = await point(page, 200, 200),
+    b = await point(page, 400, 200);
+  await page.locator('#viewport').dispatchEvent('pointerdown', {
+    pointerId: 7,
+    pointerType: 'pen',
+    clientX: a.x,
+    clientY: a.y,
+    pressure: 1,
+    buttons: 1,
+    button: 0,
+  });
+  await page.locator('#viewport').dispatchEvent('pointermove', {
+    pointerId: 7,
+    pointerType: 'pen',
+    clientX: b.x,
+    clientY: b.y,
+    pressure: 1,
+    buttons: 1,
+  });
+  await page.locator('#viewport').dispatchEvent('pointercancel', { pointerId: 7, pointerType: 'pen' });
+  await expect.poll(() => pixel(page, 300, 200)).toEqual([255, 255, 255, 255]);
+  await expect(page.locator('#undo')).toBeDisabled();
+  expect(await page.title()).not.toMatch(/^•/);
+});
+
+test('a new stroke after undo discards the abandoned redo branch', async ({ page }) => {
+  await stroke(page, 200, 200);
+  await stroke(page, 200, 400);
+  await page.locator('#undo').click();
+  await expect(page.locator('#redo')).toBeEnabled();
+  await stroke(page, 200, 600);
+  await expect(page.locator('#redo')).toBeDisabled();
+  expect(await pixel(page, 300, 400)).toEqual([255, 255, 255, 255]);
+  expect(await pixel(page, 300, 600)).not.toEqual([255, 255, 255, 255]);
+});
+
+test('canceling document replacement preserves unsaved artwork', async ({ page }) => {
+  await stroke(page);
+  await page.locator('[data-action="new"]').click();
+  await page.locator('#confirm-cancel').click();
+  await expect(page.locator('#dialog')).not.toBeVisible();
+  expect(await pixel(page, 300, 200)).not.toEqual([255, 255, 255, 255]);
+  expect(await page.title()).toMatch(/^•/);
+});
+
+test('invalid layer identities, alpha, and image data never replace the current document', async ({
+  page,
+}) => {
+  await stroke(page);
+  const original = await saveProject(page);
+  const layer = original.layers[0];
+  const cases = [
+    { ...original, active: 'missing-layer' },
+    { ...original, layers: [layer, layer] },
+    ...[-0.1, 1.1, null].map((opacity) => ({ ...original, layers: [{ ...layer, opacity }] })),
+    { ...original, layers: [{ ...layer, png: 'data:image/png;base64,AAAA' }] },
+    { ...original, layers: [{ ...layer, png: layer.png.slice(0, 100) }] },
+  ];
+  for (const data of cases) {
+    await page.locator('#toast').evaluate((el) => el.classList.remove('show'));
+    await page.locator('#project-input').setInputFiles({
+      name: 'invalid.xartist',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify(data)),
+    });
+    await expect(page.locator('#toast')).toHaveClass('show');
+    expect(await pixel(page, 300, 200)).not.toEqual([255, 255, 255, 255]);
+  }
+  expect(await saveProject(page)).toEqual(original);
+});
+
 test('compact panels and dialogs fit the minimum window in all six languages without scrolling', async ({
   page,
 }) => {
